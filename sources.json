@@ -74,7 +74,7 @@
     "Kotlin: preserve module paths containing gradle and spaces; safely iterate workflow paths containing spaces",
     "Kotlin AGP analyzer: align plugin ID and Android DSL recommendations with the installed skill and official Android documentation",
     "Kotlin JPA guide: use a mapped-class hash constant consistent with subclass equality; preserve project-specific proxy and inheritance conventions",
-    "DDD order example: name the pricing policy, show an invariant-preserving aggregate factory and keep domain assembly out of the application use case"
+    "DDD order examples: shared pricing policy and invariant-preserving aggregate; consistent CreateOrder and OrderController across architecture and separation-of-concerns rules"
   ],
   "files": {
     "skills/ddd/LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
@@ -95,7 +95,7 @@
     "skills/ddd/references/rules/library-first-approach.md": "9c9199da4ad4a5a249378e5c297ca03aa711fc20ad06740965ff9a421338dd59",
     "skills/ddd/references/rules/parallel-async-execution.md": "967bb190bbbf1a7c496d038fe1243e467aba902e9454ea8c082eaf2f6f8c6dd1",
     "skills/ddd/references/rules/principle-of-least-astonishment.md": "6a3635e6e4f5481fe9776909e885cc5b1658cdf88334480266850f20b89c74c1",
-    "skills/ddd/references/rules/separation-of-concerns.md": "7a38951a33b1de4902df6d0c4e7d8cc08ec244dd2b86ebe1aae2ed5c31d5ab81",
+    "skills/ddd/references/rules/separation-of-concerns.md": "d17daf29f8d157b0d50ab8e2b8b92e9450cd2d1c2c309117ef92f89b8e8cf854",
     "skills/kotlin-backend-jpa-entity-mapping/LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
     "skills/kotlin-backend-jpa-entity-mapping/SKILL.md": "2818f39bfd7df7d75530b5de233e40dca4330027040afb6f29b5ca5e6257b9cc",
     "skills/kotlin-tooling-agp9-migration/LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",

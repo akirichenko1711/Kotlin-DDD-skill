@@ -8,19 +8,24 @@ impact: HIGH
 # Enforce Separation of Concerns Between Layers
 
 > Modified 2026-10-19: examples and language-specific notes adapted to Kotlin from NeoLabHQ's DDD rules (GPL-3.0-only).
+> Revised 2026-10-19: align the example with the shared Order aggregate, pricing policy, and creation use case.
 
-Do NOT mix business logic with UI components or place database queries directly in controllers. Each architectural layer must have a single responsibility: controllers handle HTTP concerns, services encapsulate business logic, and repositories manage data access. Violating these boundaries creates tightly coupled code that is difficult to test, refactor, and reason about. When business rules live inside controllers, they cannot be reused across different entry points (API, CLI, events) and changes to infrastructure leak into domain logic. Maintain clear boundaries between contexts by delegating work through well-defined interfaces rather than inlining cross-cutting concerns.
+Do NOT mix business logic with UI components or place database queries directly in controllers. Each layer has a distinct responsibility: controllers handle HTTP concerns, application use cases coordinate work, the domain model owns business rules and valid aggregate creation, and infrastructure adapters handle storage. Moving calculations from a controller into an application service is not enough when it leaves the domain model unable to protect its own rules. Maintain clear boundaries so the same domain behavior can be used from an API, CLI, or event handler.
 
 ## Critical principles
 
 - Do NOT mix business logic with UI components
 - Keep database queries out of controllers
+- Keep pricing rules and aggregate creation constraints in the domain model
+- Let application use cases coordinate domain operations and persistence
 - Maintain clear boundaries between contexts
 - Ensure proper separation of responsibilities
 
+This example uses the same `Order`, `OrderItem`, `OrderPricing`, and `OrderRepository` defined in [Separate Domain Logic from Infrastructure](clean-architecture-ddd.md#correct). The fixed policy is 10% off orders above 100.00. Domain definitions are kept there rather than duplicated here. As in that example, amounts use one currency and input items are already priced; catalog lookup, transport mapping, and database mapping are omitted.
+
 ## Incorrect
 
-The controller mixes HTTP handling, business logic, and database access in a single function, making it impossible to reuse or test the business rules independently. `OrderDatabase` represents the application's database adapter; request and response types carry HTTP data.
+The controller calculates the price, writes raw data directly, and constructs the HTTP response. It bypasses the aggregate's creation path, so checks such as rejecting an empty order do not run. `OrderDatabase` is an application-owned database adapter; request, response, and returned database-record types are illustrative application types.
 
 ```kotlin
 import java.math.BigDecimal
@@ -29,23 +34,18 @@ import java.math.RoundingMode
 // OrderController.kt — everything in one place
 class OrderController(private val database: OrderDatabase) {
     suspend fun createOrder(request: CreateOrderRequest): OrderResponse {
-        // Database access directly in the controller
-        val customer = database.findCustomer(request.customerId)
-            ?: return OrderResponse(status = 404, error = "Customer not found")
-
         // Business logic mixed into the controller
-        var total = BigDecimal.ZERO
-        for (item in request.items) {
-            val product = database.findProduct(item.productId)
-                ?: throw NotFoundException("Product not found")
-            total += product.price * item.quantity.toBigDecimal()
+        val subtotal = request.items.fold(BigDecimal.ZERO) { sum, item ->
+            sum + item.price * item.quantity.toBigDecimal()
         }
-        if (total > BigDecimal("10000.00")) {
-            total = (total * BigDecimal("0.90")).setScale(2, RoundingMode.HALF_UP)
+        val total = if (subtotal > BigDecimal("100.00")) {
+            (subtotal * BigDecimal("0.90")).setScale(2, RoundingMode.HALF_UP)
+        } else {
+            subtotal
         }
 
-        // More database access inline
-        val order = database.insertOrder(CreateOrderData(customer.id, total))
+        // Direct database access instead of creating and saving an aggregate
+        val order = database.insertOrder(request.customerId, total, request.items)
         return OrderResponse(status = 201, body = order)
     }
 }
@@ -53,59 +53,41 @@ class OrderController(private val database: OrderDatabase) {
 
 ## Correct
 
-The controller delegates to a service for business logic and a repository for data access. Each layer has a single responsibility and can be tested and reused independently.
+The same creation path as the domain-boundary example is now split by responsibility:
+
+- `OrderController` delegates the HTTP request to `CreateOrder`.
+- `CreateOrder` asks `Order.create` for a complete valid aggregate, then saves it through `OrderRepository`. It contains no discount calculation.
+- The shared `Order` and `OrderPricing` own the creation constraints and price calculation.
+- `SqlOrderRepository` implements the storage contract. `saveAggregate` represents the database adapter's atomic save of the root and its items; the database transaction and mapping implementation are omitted.
 
 ```kotlin
-import java.math.BigDecimal
-import java.math.RoundingMode
+import java.util.UUID
+
+// Reuse the domain Order, OrderItem, OrderPricing, and OrderRepository
+// from the linked example; their definitions are not repeated here.
 
 // OrderController.kt — handles HTTP only
-class OrderController(private val orderService: OrderService) {
-    suspend fun createOrder(request: CreateOrderRequest): OrderResponse = try {
-        val order = orderService.createOrder(request.customerId, request.items)
-        OrderResponse(status = 201, body = order)
-    } catch (error: NotFoundException) {
-        OrderResponse(status = 404, error = error.message)
+class OrderController(private val createOrder: CreateOrder) {
+    suspend fun createOrder(request: CreateOrderRequest): OrderResponse {
+        val order = createOrder.execute(request.customerId, request.items)
+        return OrderResponse(status = 201, body = order)
     }
 }
 
-// OrderService.kt — business logic only
-class OrderService(
-    private val customers: CustomerRepository,
-    private val products: ProductRepository,
-    private val orders: OrderRepository,
-) {
-    suspend fun createOrder(customerId: String, items: List<OrderItem>): Order {
-        val customer = customers.findById(customerId)
-            ?: throw NotFoundException("Customer not found")
-        val total = calculateTotal(items)
-        return orders.create(CreateOrderData(customer.id, total))
+// CreateOrder.kt — application orchestration, identical to the linked example
+class CreateOrder(private val orders: OrderRepository) {
+    suspend fun execute(customerId: String, items: List<OrderItem>): Order {
+        val order = Order.create(UUID.randomUUID(), customerId, items)
+        orders.save(order)
+        return order
     }
-
-    private suspend fun calculateTotal(items: List<OrderItem>): BigDecimal {
-        var total = BigDecimal.ZERO
-        for (item in items) {
-            val product = products.findById(item.productId)
-                ?: throw NotFoundException("Product not found")
-            total += product.price * item.quantity.toBigDecimal()
-        }
-        return if (total > BigDecimal("10000.00")) {
-            (total * BigDecimal("0.90")).setScale(2, RoundingMode.HALF_UP)
-        } else {
-            total
-        }
-    }
-}
-
-// OrderRepository.kt — data-access contract
-interface OrderRepository {
-    suspend fun create(data: CreateOrderData): Order
 }
 
 // SqlOrderRepository.kt — data access only
 class SqlOrderRepository(private val database: OrderDatabase) : OrderRepository {
-    override suspend fun create(data: CreateOrderData): Order =
-        database.insertOrder(data)
+    override suspend fun save(order: Order) {
+        database.saveAggregate(order)
+    }
 }
 ```
 
