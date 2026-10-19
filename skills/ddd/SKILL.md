@@ -11,6 +11,11 @@ metadata:
 
 # Domain-driven design and code quality
 
+Codex adaptation dated 2026-10-19, based on NeoLabHQ's DDD rules. The entrypoint
+and contextual guidance were added; all 17 original rule files are unchanged.
+This adaptation is distributed under GPL-3.0-only; see [LICENSE](LICENSE),
+including its no-warranty terms.
+
 Use the original NeoLabHQ DDD rules to assess the code relevant to the task.
 Follow the current user instructions, applicable AGENTS.md, and repository
 conventions first. This skill can be used directly or alongside poteto-mode,

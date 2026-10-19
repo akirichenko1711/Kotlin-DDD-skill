@@ -77,7 +77,7 @@
   ],
   "files": {
     "skills/ddd/LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
-    "skills/ddd/SKILL.md": "e8a78a4f82d76c144235d25eeebda740a913f98c933eb88d1f3214ef54fb0e31",
+    "skills/ddd/SKILL.md": "aff34cda3f93cadaeb372f2a64089b0ed760691462219783ec3ec5d697e243bc",
     "skills/ddd/references/rules/avoid-code-duplication.md": "2fc7d37d7a815e80e38811f20d42516cd58aadd1c219a87a748d78d6fbb11686",
     "skills/ddd/references/rules/boy-scout-rule.md": "a41426c6f26ad07a6010911cc6dcff66abf2fd8c9c837905e276204c41138942",
     "skills/ddd/references/rules/call-site-honesty.md": "f117ab532b3992c894b705754a2f471d3834a51cbcfaba3cb46e16e0e5992e1c",
@@ -159,6 +159,7 @@
   },
   "packaging_changes": [
     "Preserve upstream authors and component license texts",
-    "Add dated modification notices to the three locally modified Kotlin files"
+    "Add dated modification notices to the three locally modified Kotlin files",
+    "2026-10-19: clarify upstream attribution and component licenses in README; add explicit GPL adaptation date and license notice"
   ]
 }

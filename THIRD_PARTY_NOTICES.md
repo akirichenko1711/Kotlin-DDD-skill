@@ -7,7 +7,7 @@
 - Upstream component author: Vlad Goncharov (NeoLabHQ).
 - Source revision: `23e2428e809d77717f8acc9659c374a3a1fcb93e`.
 - License: [GNU General Public License version 3](skills/ddd/LICENSE).
-- The 17 rule files are copied without content changes. A Codex-compatible `SKILL.md` was added to route requests to those rules and preserve the current user's and project's instructions.
+- Adaptation date: 2026-10-19. The 17 rule files are copied without content changes. A Codex-compatible `SKILL.md` was added to route requests to those rules and preserve the current user's and project's instructions. The DDD component and its adaptation are distributed under GPL-3.0-only; the full license, including its no-warranty terms, is included.
 
 ## Kotlin Agent Skills
 
