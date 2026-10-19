@@ -1,99 +1,38 @@
 # Kotlin DDD skill
 
-Набор из **11 навыков для Codex**: DDD с 17 правилами и 10 навыков из Kotlin Agent Skills. Подходит для обычных задач Codex и работы через poteto-mode. Cursor не требуется.
+A collection of **11 skills for Codex**: one DDD skill with 17 rules and 10 Kotlin skills. Created to make architecture reviews and Kotlin development guidance easy to install and use together, with Codex adaptations and targeted fixes.
 
-## Основа и авторы
+## Install
 
-Сборка основана на работе авторов двух открытых проектов:
-
-- **DDD:** [NeoLabHQ Context Engineering Kit](https://github.com/NeoLabHQ/context-engineering-kit/tree/23e2428e809d77717f8acc9659c374a3a1fcb93e/plugins/ddd), автор компонента — **Vlad Goncharov (NeoLabHQ)**. Лицензия: [GPL-3.0-only](skills/ddd/LICENSE).
-- **Kotlin:** [Kotlin Agent Skills](https://github.com/Kotlin/kotlin-agent-skills/tree/c2f90697bf71966a117a13340d5fff787f004140), проект **Kotlin / JetBrains**. Лицензия: [Apache-2.0](skills/kotlin-backend-jpa-entity-mapping/LICENSE).
-
-Наш вклад — упаковка для Codex, адаптация входного файла DDD и описанные ниже исправления Kotlin-навыков. Адаптация подготовлена **19 октября 2026 года**. Исходные авторы сохраняют права на свои материалы; тексты лицензий и сведения об источниках включены в набор.
-
-Это независимая адаптированная сборка; она не является официальным объединённым продуктом NeoLabHQ, Kotlin или JetBrains. DDD вместе с нашей адаптацией остаётся под GPL-3.0-only, Kotlin-навыки — под Apache-2.0. Подробности: [лицензии](LICENSE.md) и [сведения об авторах](THIRD_PARTY_NOTICES.md).
-
-## Установка в Codex
-
-Попросите Codex:
+Ask Codex:
 
 ```text
-$skill-installer Установи глобально все 11 навыков из репозитория
-https://github.com/akirichenko1711/Kotlin-DDD-skill — они находятся в папке skills.
-Существующие навыки не перезаписывай.
+$skill-installer Install all 11 skills from
+https://github.com/akirichenko1711/Kotlin-DDD-skill
+They are in skills/. Install globally without overwriting existing skills.
 ```
 
-Для установки из терминала используйте стандартный установщик Codex:
+The skills will be available from your next message.
 
-```bash
-python3 "${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-installer/scripts/install-skill-from-github.py" \
-  --repo akirichenko1711/Kotlin-DDD-skill \
-  --method git \
-  --path \
-  skills/ddd \
-  skills/kotlin-backend-jpa-entity-mapping \
-  skills/kotlin-tooling-agp9-migration \
-  skills/kotlin-tooling-cocoapods-spm-migration \
-  skills/kotlin-tooling-gradle-to-kotlin-toolchain-plugin \
-  skills/kotlin-tooling-gradle-to-kotlin-toolchain-project \
-  skills/kotlin-tooling-immutable-collections-0-5-x-migration \
-  skills/kotlin-tooling-java-to-kotlin \
-  skills/kotlin-tooling-kotlin-toolchain \
-  skills/kotlin-tooling-kotlin-toolchain-plugin-authoring \
-  skills/kotlin-tooling-native-build-performance
-```
-
-Команда рассчитана на Codex с установленным системным навыком `skill-installer`; нужны Python 3 и Git. Для приватного репозитория потребуется доступ к нему через GitHub. Установщик помещает навыки в `$CODEX_HOME/skills` (по умолчанию `~/.codex/skills`) и отказывается перезаписывать уже существующие папки.
-
-После установки навыки доступны со следующего сообщения. Codex может выбирать их по содержанию задачи; для явного выбора укажите `$имя-навыка`.
-
-## Что входит
-
-| Навык | Назначение |
-|---|---|
-| `ddd` | Бизнес-логика, границы ответственности, архитектура и качество кода; 17 исходных правил |
-| `kotlin-backend-jpa-entity-mapping` | Модели базы данных, сравнение объектов и запросы в Kotlin с JPA/Hibernate |
-| `kotlin-tooling-agp9-migration` | Переход Kotlin Multiplatform на Android Gradle Plugin 9 |
-| `kotlin-tooling-cocoapods-spm-migration` | Переход с CocoaPods на Swift Package Manager |
-| `kotlin-tooling-gradle-to-kotlin-toolchain-plugin` | Перенос отдельного плагина Gradle в Kotlin Toolchain |
-| `kotlin-tooling-gradle-to-kotlin-toolchain-project` | Перенос проекта Gradle в Kotlin Toolchain |
-| `kotlin-tooling-immutable-collections-0-5-x-migration` | Обновление неизменяемых коллекций Kotlin до 0.5.x |
-| `kotlin-tooling-java-to-kotlin` | Перевод Java-кода на Kotlin с учётом используемых библиотек |
-| `kotlin-tooling-kotlin-toolchain` | Создание, сборка и настройка проектов Kotlin Toolchain |
-| `kotlin-tooling-kotlin-toolchain-plugin-authoring` | Создание новых плагинов Kotlin Toolchain |
-| `kotlin-tooling-native-build-performance` | Поиск причин медленных сборок Kotlin/Native |
-
-## Примеры
+## Use
 
 ```text
-$ddd Проверь бизнес-логику и архитектуру этого изменения.
+$ddd Review the architecture and business logic of this change.
 ```
 
 ```text
-$kotlin-backend-jpa-entity-mapping Проверь модели и работу с базой данных.
+$kotlin-backend-jpa-entity-mapping Review these Kotlin JPA entities.
 ```
 
-```text
-$poteto-mode Найди причину медленной сборки iOS и используй подходящий Kotlin-навык.
-```
+Codex can also select relevant skills automatically based on your request. Browse [skills/](skills/) for the full collection.
 
-Последний пример предполагает отдельно установленный pstack. Сам этот репозиторий содержит только DDD и Kotlin. Общие правила пользователя и проекта продолжают определять выполнение задачи.
+## Authors and licenses
 
-## Отличия от исходных проектов
+Based on these upstream projects:
 
-- Для DDD добавлен `SKILL.md`, понятный Codex. Все 17 оригинальных правил сохранены без изменений в `skills/ddd/references/rules/`.
-- В двух Kotlin-анализаторах исправлена обработка путей с пробелами и названий папок со словом `gradle`.
-- Подсказки Android-анализатора приведены в соответствие с установленным руководством и официальной документацией: [Android](https://developer.android.com/kotlin/multiplatform/plugin), [Kotlin](https://kotlinlang.org/docs/multiplatform/multiplatform-project-agp-9-migration.html).
-- В примере JPA исправлен способ вычисления хеша для сравниваемых объектов; сохранён приоритет правил конкретного проекта для наследования и Hibernate.
+- **DDD:** [NeoLabHQ Context Engineering Kit](https://github.com/NeoLabHQ/context-engineering-kit/tree/23e2428e809d77717f8acc9659c374a3a1fcb93e/plugins/ddd), component author **Vlad Goncharov (NeoLabHQ)**. The rules and Codex adaptation are licensed under [GPL-3.0-only](skills/ddd/LICENSE).
+- **Kotlin:** [Kotlin Agent Skills](https://github.com/Kotlin/kotlin-agent-skills/tree/c2f90697bf71966a117a13340d5fff787f004140), **Kotlin / JetBrains**, licensed under [Apache-2.0](skills/kotlin-backend-jpa-entity-mapping/LICENSE).
 
-Версии исходников, список локальных изменений и контрольные суммы файлов записаны в [sources.json](sources.json). Отличия трёх файлов Kotlin от исходного проекта сохранены в [patches/local-fixes.patch](patches/local-fixes.patch).
+Our contribution is Codex packaging, the DDD entrypoint, and targeted Kotlin fixes. This is an independent collection.
 
-## Проверка сборки навыков
-
-При подготовке проверены распознавание всех 11 навыков Codex, их структура, внутренние ссылки и неизменность 17 исходных правил DDD. Встроенные анализаторы проверены на примерах с проблемами и без них, включая пути с пробелами; семь проверок прошли.
-
-Исправление примера сравнения проверено эквивалентным алгоритмом на Java 21. Это не проверка реального Kotlin-приложения или Hibernate; сборки и миграции конкретных приложений проверяются в соответствующем проекте.
-
-## Лицензии и авторы
-
-DDD распространяется по GPL-3.0-only, Kotlin-навыки — по Apache-2.0. Полные тексты лицензий сохранены в папках навыков. См. [LICENSE.md](LICENSE.md) и [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+See [license details](LICENSE.md), [author and modification notices](THIRD_PARTY_NOTICES.md), and [source revisions and changes](sources.json).
