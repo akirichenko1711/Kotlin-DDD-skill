@@ -73,7 +73,8 @@
     "DDD: native Codex entrypoint and Kotlin adaptations of all 17 upstream rule files (50 code examples)",
     "Kotlin: preserve module paths containing gradle and spaces; safely iterate workflow paths containing spaces",
     "Kotlin AGP analyzer: align plugin ID and Android DSL recommendations with the installed skill and official Android documentation",
-    "Kotlin JPA guide: use a mapped-class hash constant consistent with subclass equality; preserve project-specific proxy and inheritance conventions"
+    "Kotlin JPA guide: use a mapped-class hash constant consistent with subclass equality; preserve project-specific proxy and inheritance conventions",
+    "DDD order example: name the pricing policy, show an invariant-preserving aggregate factory and keep domain assembly out of the application use case"
   ],
   "files": {
     "skills/ddd/LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
@@ -81,7 +82,7 @@
     "skills/ddd/references/rules/avoid-code-duplication.md": "3edb9f8080290429381176b0a7a2261829a8b1b9ba8a0d3e4d064d94a29c82ee",
     "skills/ddd/references/rules/boy-scout-rule.md": "09387dc6f0eac13ef8cf77a83fae60e711e910ae29ae7c5cf0b72cce9fab9fe0",
     "skills/ddd/references/rules/call-site-honesty.md": "137fbae8c9a74e9ba07bfa896591ae384414acf598bd3d20e6b2cf5905fc3aa9",
-    "skills/ddd/references/rules/clean-architecture-ddd.md": "368a75e6c8d85d3ef2966b89261d7fa8e02969945c6c29e29f6e12caa3fdf4b7",
+    "skills/ddd/references/rules/clean-architecture-ddd.md": "efe83fff590589cf064327c825cf910518e07b3b80ddbf7ac6458c66264ecc27",
     "skills/ddd/references/rules/command-query-separation.md": "00d3bbc601101c89c3e69d595f801bcb5ab40bea7c384d76ee584d36f18c07f0",
     "skills/ddd/references/rules/domain-specific-naming.md": "160c00d17f98eac7eecf132bfd4c82ad094a5a22e74e6dff96b6c4180fa55a08",
     "skills/ddd/references/rules/early-return-pattern.md": "9d3d7c52749a7e09fac8c6d5ca65c1875280b1019d65bc3b557c3fcbc4fe24e8",
