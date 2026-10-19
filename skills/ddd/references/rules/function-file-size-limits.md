@@ -8,65 +8,60 @@ paths:
 
 # Function and File Size Limits
 
+> Modified 2026-10-19: examples and language-specific notes adapted to Kotlin from NeoLabHQ's DDD rules (GPL-3.0-only).
+
 - Decompose functions longer than 80 lines into smaller, focused functions of 50 lines or fewer. When a function grows beyond 80 lines, it is almost certainly doing more than one thing and should be split. 
 - Keep files under 200 lines of code. Large functions accumulate multiple responsibilities, making them harder to test, review, and reuse. 
 - Extract cohesive blocks of logic into named functions that each serve a single purpose. If extracted functions are only used within the same context, keep them in the same file. However, when a file exceeds 200 lines even after decomposition, split related functions into separate modules grouped by responsibility.
 
 ## Incorrect
 
-A single function handles validation, transformation, persistence, and notification. At over 80 lines it is difficult to test individual behaviors or reuse any part of the logic.
+A single function handles validation, transformation, persistence, and notification. The condensed example below shows the responsibilities that can make a real implementation grow beyond 80 lines and become difficult to test or reuse independently. The repository, password hasher, and notification services are application-owned ports; `clock` is a `java.time.Clock`.
 
-```typescript
-async function processUserRegistration(input: unknown) {
-  // Validate input (lines 1-20)
-  if (!input || typeof input !== 'object') throw new Error('Invalid input')
-  const { email, name, password, role } = input as Record<string, unknown>
-  if (!email || typeof email !== 'string') throw new Error('Email required')
-  if (!name || typeof name !== 'string') throw new Error('Name required')
-  if (!password || typeof password !== 'string') throw new Error('Password required')
-  if (password.length < 8) throw new Error('Password too short')
-  if (!/[A-Z]/.test(password)) throw new Error('Password needs uppercase')
-  if (!/[0-9]/.test(password)) throw new Error('Password needs digit')
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!emailRegex.test(email)) throw new Error('Invalid email format')
+```kotlin
+suspend fun processUserRegistration(input: Any?): User {
+    // Validate input.
+    require(input is Map<*, *>) { "Invalid input" }
+    val email = input["email"] as? String ?: throw IllegalArgumentException("Email required")
+    val name = input["name"] as? String ?: throw IllegalArgumentException("Name required")
+    val password = input["password"] as? String ?: throw IllegalArgumentException("Password required")
+    val role = input["role"] as? String
+    require(email.isNotEmpty()) { "Email required" }
+    require(name.isNotEmpty()) { "Name required" }
+    require(password.isNotEmpty()) { "Password required" }
+    require(password.length >= 8) { "Password too short" }
+    require(password.any { it in 'A'..'Z' }) { "Password needs uppercase" }
+    require(password.any { it in '0'..'9' }) { "Password needs digit" }
+    require(Regex("""^[^\s@]+@[^\s@]+\.[^\s@]+$""").matches(email)) { "Invalid email format" }
 
-  // Normalize data (lines 21-35)
-  const normalizedEmail = email.toLowerCase().trim()
-  const normalizedName = name.trim().replace(/\s+/g, ' ')
-  const hashedPassword = await bcrypt.hash(password, 12)
-  const assignedRole = role === 'admin' ? 'user' : (role as string) || 'user'
-  const createdAt = new Date()
-  const updatedAt = new Date()
+    // Normalize data.
+    val normalizedEmail = email.lowercase().trim()
+    val normalizedName = name.trim().replace(Regex("""\s+"""), " ")
+    val hashedPassword = passwordHasher.hash(password, cost = 12)
+    val assignedRole = role?.takeUnless { it == "admin" || it.isEmpty() } ?: "user"
+    val createdAt = clock.instant()
+    val updatedAt = createdAt
 
-  // Check duplicates and persist (lines 36-55)
-  const existing = await db.users.findUnique({ where: { email: normalizedEmail } })
-  if (existing) throw new Error('Email already registered')
-  const user = await db.users.create({
-    data: {
-      email: normalizedEmail,
-      name: normalizedName,
-      password: hashedPassword,
-      role: assignedRole,
-      createdAt,
-      updatedAt,
-    },
-  })
+    // Check duplicates and persist.
+    val existing = users.findByEmail(normalizedEmail)
+    check(existing == null) { "Email already registered" }
+    val user = users.create(
+        NewUser(
+            email = normalizedEmail,
+            name = normalizedName,
+            passwordHash = hashedPassword,
+            role = assignedRole,
+            createdAt = createdAt,
+            updatedAt = updatedAt,
+        ),
+    )
 
-  // Send notifications (lines 56-80+)
-  const welcomeHtml = `<h1>Welcome ${normalizedName}</h1><p>Your account is ready.</p>`
-  await emailService.send({
-    to: normalizedEmail,
-    subject: 'Welcome!',
-    html: welcomeHtml,
-  })
-  await analyticsService.track('user_registered', {
-    userId: user.id,
-    role: assignedRole,
-    timestamp: createdAt.toISOString(),
-  })
-  await auditLog.record('registration', { userId: user.id, email: normalizedEmail })
+    // Send notifications.
+    emailService.sendWelcome(normalizedEmail, normalizedName)
+    analyticsService.trackRegistration(user.id, assignedRole, createdAt)
+    auditLog.recordRegistration(user.id, normalizedEmail)
 
-  return user
+    return user
 }
 ```
 
@@ -74,54 +69,49 @@ async function processUserRegistration(input: unknown) {
 
 Each responsibility is extracted into a focused function under 50 lines. Functions that are only used together stay in the same file.
 
-```typescript
-function validateRegistrationInput(input: unknown): RegistrationInput {
-  if (!input || typeof input !== 'object') 
-    return new Error('Invalid input')
-  const { email, name, password, role } = input as Record<string, unknown>
-  if (!email || typeof email !== 'string') 
-    return new Error('Email required')
-  if (!name || typeof name !== 'string') 
-    return new Error('Name required')
-  if (!password || typeof password !== 'string') 
-    return new Error('Password required')
-  if (password.length < 8) 
-    return new Error('Password too short')
-  if (!/[A-Z]/.test(password)) 
-    return new Error('Password needs uppercase')
-  if (!/[0-9]/.test(password)) 
-    return new Error('Password needs digit')
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) 
-    return new Error('Invalid email format')
+```kotlin
+fun validateRegistrationInput(input: Any?): RegistrationInput {
+    require(input is Map<*, *>) { "Invalid input" }
+    val email = input["email"] as? String ?: throw IllegalArgumentException("Email required")
+    val name = input["name"] as? String ?: throw IllegalArgumentException("Name required")
+    val password = input["password"] as? String ?: throw IllegalArgumentException("Password required")
+    val role = input["role"] as? String
+    require(email.isNotEmpty()) { "Email required" }
+    require(name.isNotEmpty()) { "Name required" }
+    require(password.isNotEmpty()) { "Password required" }
+    require(password.length >= 8) { "Password too short" }
+    require(password.any { it in 'A'..'Z' }) { "Password needs uppercase" }
+    require(password.any { it in '0'..'9' }) { "Password needs digit" }
+    require(Regex("""^[^\s@]+@[^\s@]+\.[^\s@]+$""").matches(email)) { "Invalid email format" }
+    return RegistrationInput(email, name, password, role)
 }
 
-async function normalizeAndHash(input: RegistrationInput): Promise<NormalizedUser> {
-  return {
-    email: input.email.toLowerCase().trim(),
-    name: input.name.trim().replace(/\s+/g, ' '),
-    password: await bcrypt.hash(input.password, 12),
-    role: input.role === 'admin' ? 'user' : input.role,
-  }
+suspend fun normalizeAndHash(input: RegistrationInput): NormalizedUser = NormalizedUser(
+    email = input.email.lowercase().trim(),
+    name = input.name.trim().replace(Regex("""\s+"""), " "),
+    passwordHash = passwordHasher.hash(input.password, cost = 12),
+    role = input.role?.takeUnless { it == "admin" || it.isEmpty() } ?: "user",
+)
+
+suspend fun persistUser(data: NormalizedUser): User {
+    check(users.findByEmail(data.email) == null) { "Email already registered" }
+    val now = clock.instant()
+    return users.create(
+        NewUser(data.email, data.name, data.passwordHash, data.role, now, now),
+    )
 }
 
-async function persistUser(data: NormalizedUser): Promise<User> {
-  const existing = await db.users.findUnique({ where: { email: data.email } })
-  if (existing) 
-    throw new Error('Email already registered')
-  return db.users.create({ data: { ...data, createdAt: new Date(), updatedAt: new Date() } })
+suspend fun notifyRegistration(user: User) {
+    emailService.sendWelcome(user.email, user.name)
+    analyticsService.trackRegistration(user.id, user.role, user.createdAt)
+    auditLog.recordRegistration(user.id, user.email)
 }
 
-async function notifyRegistration(user: User): Promise<void> {
-  await emailService.send({ to: user.email, subject: 'Welcome!', html: `<h1>Welcome ${user.name}</h1>` })
-  await analyticsService.track('user_registered', { userId: user.id, role: user.role })
-  await auditLog.record('registration', { userId: user.id, email: user.email })
-}
-
-async function processUserRegistration(input: unknown): Promise<User> {
-  const validated = validateRegistrationInput(input)
-  const normalized = await normalizeAndHash(validated)
-  const user = await persistUser(normalized)
-  await notifyRegistration(user)
-  return user
+suspend fun processUserRegistration(input: Any?): User {
+    val validated = validateRegistrationInput(input)
+    val normalized = normalizeAndHash(validated)
+    val user = persistUser(normalized)
+    notifyRegistration(user)
+    return user
 }
 ```

@@ -7,6 +7,8 @@ impact: HIGH
 
 # Separate Domain Logic from Infrastructure
 
+> Modified 2026-10-19: examples and language-specific notes adapted to Kotlin from NeoLabHQ's DDD rules (GPL-3.0-only).
+
 Keep business logic in pure domain and use case layers, free of framework or infrastructure dependencies. When domain logic is coupled to controllers, ORMs, or HTTP libraries, it becomes untestable in isolation, impossible to reuse across delivery mechanisms, and fragile to infrastructure changes. Define domain entities that model business rules with no imports from framework or database packages. Implement use cases as classes that depend on abstract repository interfaces, not concrete database clients. Let the infrastructure layer implement those interfaces and inject them at composition time. This dependency inversion ensures the domain drives the architecture rather than the framework dictating how business rules are organized.
 
 ## Critical Clean Architecture & DDD Principles
@@ -18,28 +20,28 @@ Keep business logic in pure domain and use case layers, free of framework or inf
 
 ## Incorrect
 
-Business logic is embedded directly in the HTTP handler, coupled to the web framework and database client. Testing requires spinning up the full server and database.
+Business logic is embedded directly in the HTTP adapter and coupled to database access. Testing the pricing rule requires a database or a database stub. `OrderDatabase`, request, and response types represent application-specific infrastructure adapters and transport data; framework setup is omitted.
 
-```typescript
-import express from "express";
-import { PrismaClient } from "@prisma/client";
+```kotlin
+import java.math.BigDecimal
+import java.math.RoundingMode
 
-const app = express();
-const prisma = new PrismaClient();
+// HTTP adapter — business rules and database access mixed together
+class OrderController(private val database: OrderDatabase) {
+    suspend fun createOrder(request: CreateOrderRequest): OrderResponse {
+        val subtotal = request.items.fold(BigDecimal.ZERO) { sum, item ->
+            sum + item.price * item.quantity.toBigDecimal()
+        }
+        val total = if (subtotal > BigDecimal("100.00")) {
+            (subtotal * BigDecimal("0.90")).setScale(2, RoundingMode.HALF_UP)
+        } else {
+            subtotal
+        }
 
-app.post("/orders", async (req, res) => {
-  const { customerId, items } = req.body;
-
-  // Business rule mixed into the controller
-  const total = items.reduce((sum, i) => sum + i.price * i.qty, 0);
-  const discount = total > 100 ? total * 0.1 : 0;
-
-  const order = await prisma.order.create({
-    data: { customerId, total: total - discount, items: { create: items } },
-  });
-
-  res.json(order);
-});
+        val order = database.insertOrder(request.customerId, total, request.items)
+        return OrderResponse(status = 201, body = order)
+    }
+}
 ```
 
 Poor Architectural Choices:
@@ -51,29 +53,41 @@ Poor Architectural Choices:
 
 Domain logic lives in a framework-free use case that depends on an abstract repository. The controller is a thin adapter that delegates to the use case.
 
-```typescript
-// domain/order.ts — pure business logic, no framework imports
-export function calculateOrderTotal(items: OrderItem[]): number {
-  const subtotal = items.reduce((sum, i) => sum + i.price * i.qty, 0);
-  const discount = subtotal > 100 ? subtotal * 0.1 : 0;
-  return subtotal - discount;
+```kotlin
+import java.math.BigDecimal
+import java.math.RoundingMode
+
+// domain/Order.kt — pure business logic, no framework imports
+fun calculateOrderTotal(items: List<OrderItem>): BigDecimal {
+    val subtotal = items.fold(BigDecimal.ZERO) { sum, item ->
+        sum + item.price * item.quantity.toBigDecimal()
+    }
+    return if (subtotal > BigDecimal("100.00")) {
+        (subtotal * BigDecimal("0.90")).setScale(2, RoundingMode.HALF_UP)
+    } else {
+        subtotal
+    }
 }
 
-// application/create-order.ts — use case depends on abstraction
-export class CreateOrder {
-  constructor(private readonly orders: OrderRepository) {}
-
-  async execute(customerId: string, items: OrderItem[]): Promise<Order> {
-    const total = calculateOrderTotal(items);
-    return this.orders.save({ customerId, total, items });
-  }
+interface OrderRepository {
+    suspend fun save(order: Order): Order
 }
 
-// infrastructure/controller.ts — thin adapter
-app.post("/orders", async (req, res) => {
-  const order = await createOrder.execute(req.body.customerId, req.body.items);
-  res.json(order);
-});
+// application/CreateOrder.kt — use case depends on an abstraction
+class CreateOrder(private val orders: OrderRepository) {
+    suspend fun execute(customerId: String, items: List<OrderItem>): Order {
+        val order = Order(customerId, calculateOrderTotal(items), items.toList())
+        return orders.save(order)
+    }
+}
+
+// infrastructure/OrderController.kt — thin HTTP adapter
+class OrderController(private val createOrder: CreateOrder) {
+    suspend fun createOrder(request: CreateOrderRequest): OrderResponse {
+        val order = createOrder.execute(request.customerId, request.items)
+        return OrderResponse(status = 201, body = order)
+    }
+}
 ```
 
 ## Reference

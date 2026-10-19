@@ -6,6 +6,8 @@ paths:
 
 # Boy Scout Rule — Incremental Improvement Without Scope Creep
 
+> Modified 2026-10-19: examples and language-specific notes adapted to Kotlin from NeoLabHQ's DDD rules (GPL-3.0-only).
+
 Rules: 
 - Leave code better than you found it (Martin, "Clean Code") — but limit improvements to the code you are already touching. 
 - Apply Opportunistic Refactoring (Fowler): make small cleanups while working on a task, not as a separate effort. Stop when the improvement is unrelated to your current change. 
@@ -24,20 +26,13 @@ Task is to fix a null-check bug in `getUser`. Agent also restructures the module
 
 Starting code: `getUser` can crash when `user.profile` is missing
 
-```typescript
+```kotlin
 // Task: fix bug — getUser crashes when user has no profile
-
-import { userRepo } from './userRepo';
-import { formatName } from './formatName';
-
-export async function getUser(id: string): Promise<User> {
-  const user = await userRepo.findById(id);
-  if (!user) {
-    throw new NotFoundError('User');
-  }
-  // Bug: assumes profile always exists
-  const r = { ...user, displayName: formatName(user.name, user.profile) };
-  return r;
+suspend fun getUser(id: String): User {
+    val user = userRepo.findById(id) ?: throw NotFoundException("User")
+    // Bug: assumes profile always exists
+    val r = user.copy(displayName = formatName(user.name, user.profile!!))
+    return r
 }
 ```
 
@@ -45,48 +40,53 @@ export async function getUser(id: string): Promise<User> {
 
 Agent rewrites the whole module instead of fixing the bug in place.
 
-```typescript
+```kotlin
 // Task: fix bug — getUser crashes when user has no profile
 
-// Agent rewrites entire module instead of fixing the bug
-import { pipe } from 'fp-ts/function';
-import * as O from 'fp-ts/Option';
-
-// Renamed from getUser to fetchUserWithProfile (unrelated change)
-export async function fetchUserWithProfile(id: string): Promise<UserDTO> {
-  // Introduced Result pattern (unrelated change)
-  const result = await pipe(
-    userRepo.findById(id),
-    O.fromNullable,
-    O.map(enrichWithProfile),
-    O.getOrElse(() => { throw new NotFoundError('User'); })
-  );
-  // Extracted new DTO mapper (unrelated change)
-  return UserMapper.toDTO(result);
+// Agent introduces a new result hierarchy for a local null-check fix.
+sealed interface UserLookupResult {
+    data class Found(val user: User) : UserLookupResult
+    data object Missing : UserLookupResult
 }
 
-// Refactored other functions not related to the bug
-export async function listUsers(): Promise<UserDTO[]> { /* ... rewritten ... */ }
-export async function deleteUser(id: string): Promise<void> { /* ... rewritten ... */ }
+// Renamed from getUser to fetchUserWithProfile (unrelated change).
+suspend fun fetchUserWithProfile(id: String): UserDto {
+    val result = userRepo.findById(id)?.let { UserLookupResult.Found(it) }
+        ?: UserLookupResult.Missing
+    val user = when (result) {
+        is UserLookupResult.Found -> enrichWithProfile(result.user)
+        UserLookupResult.Missing -> throw NotFoundException("User")
+    }
+    // Introduced a DTO mapper (unrelated change).
+    return UserMapper.toDto(user)
+}
+
+private fun enrichWithProfile(user: User): User {
+    val profile = user.profile ?: DEFAULT_PROFILE
+    return user.copy(profile = profile, displayName = formatName(user.name, profile))
+}
+
+// Refactored other functions not related to the bug.
+suspend fun listUsers(): List<UserDto> =
+    userRepo.findAll().map { UserMapper.toDto(enrichWithProfile(it)) }
+
+suspend fun deleteUser(id: String) = userRepo.removeById(id)
 ```
 
 ### Correct
 
 Agent fixes the bug and makes only small, adjacent improvements to the code it already touches.
 
-```typescript
+```kotlin
 // Task: fix bug — getUser crashes when user has no profile
-export async function getUser(id: string): Promise<User> {
-  const user = await userRepo.findById(id);
-  if (!user) {
-    throw new NotFoundError('User');
-  }
+suspend fun getUser(id: String): User {
+    val user = userRepo.findById(id) ?: throw NotFoundException("User")
 
-  // Bug fix: guard against missing profile
-  const profile = user.profile ?? DEFAULT_PROFILE;
+    // Bug fix: guard against missing profile.
+    val profile = user.profile ?: DEFAULT_PROFILE
 
-  // Boy scout: remove unclear variable that only makes the code more complex
-  return { ...user, profile, displayName: formatName(user.name) };
+    // Boy scout: remove an unclear temporary variable in the code being changed.
+    return user.copy(profile = profile, displayName = formatName(user.name, profile))
 }
 ```
 

@@ -8,14 +8,16 @@ paths:
 
 # Use Existing Libraries Instead of Custom Code
 
+> Modified 2026-10-19: examples and language-specific notes adapted to Kotlin from NeoLabHQ's DDD rules (GPL-3.0-only).
+
 Always search for existing libraries, services, or third-party APIs before writing custom code:
-- Check npm for existing libraries that solve the problem
+- Check Maven Central and the Kotlin ecosystem for existing libraries that solve the problem
 - Evaluate existing services/SaaS solutions
 - Consider third-party APIs for common functionality
 
 Every line of custom code is a liability that requires maintenance, testing, and documentation. The Not Invented Here (NIH) syndrome leads to fragile, undertested reimplementations of solved problems.
 
-Before writing any utility, helper, or infrastructure code, check npm for established packages that solve the problem. For example, use `cockatiel` instead of writing your own retry logic.
+Before writing any utility, helper, or infrastructure code, check Maven Central and the Kotlin ecosystem for established libraries that solve the problem. For example, use Resilience4j instead of writing your own retry logic.
 
 Custom code is only justified when:
 - Specific business logic unique to the domain
@@ -28,44 +30,62 @@ Custom code is only justified when:
 
 Custom retry logic is implemented from scratch instead of using an established library. This hand-rolled solution lacks features like exponential backoff, jitter, circuit breaking, and proper error classification that battle-tested libraries provide.
 
-```typescript
-// Custom retry utility - reinventing the wheel
-async function retry<T>(
-  fn: () => Promise<T>,
-  maxRetries: number = 3,
-  delay: number = 1000
-): Promise<T> {
-  let lastError: Error
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      return await fn()
-    } catch (error) {
-      lastError = error as Error
-      await new Promise((resolve) => setTimeout(resolve, delay))
+```kotlin
+import kotlinx.coroutines.delay
+
+// Custom retry utility — reinventing the wheel
+suspend fun <T> retry(
+    maxAttempts: Int = 3,
+    delayMillis: Long = 1_000,
+    operation: suspend () -> T,
+): T {
+    require(maxAttempts > 0)
+    var lastError: Exception? = null
+    repeat(maxAttempts) {
+        try {
+            return operation()
+        } catch (error: Exception) {
+            lastError = error
+            delay(delayMillis)
+        }
     }
-  }
-  throw lastError!
+    throw checkNotNull(lastError)
 }
 
-const data = await retry(() => fetchFromApi('/users'))
+suspend fun loadUsers(fetchFromApi: suspend (String) -> List<User>): List<User> =
+    retry { fetchFromApi("/users") }
 ```
 
 Anti-Pattern to Avoid: NIH (Not Invented Here) Syndrome:
 - Don't build custom auth when Auth0/Supabase exists
-- Don't write custom state management instead of using Redux/Zustand
+- Don't write custom state management instead of using established Kotlin libraries
 - Don't create custom form validation instead of using established libraries
 
 ## Correct
 
-An established library handles retry logic with proven patterns for backoff, jitter, and circuit breaking out of the box.
+An established library provides retry policies with backoff, jitter, and error classification, and can be composed with a circuit breaker when needed. This example uses the `resilience4j-kotlin` and `resilience4j-retry` modules; only I/O failures are retried, so coroutine cancellation and business errors propagate immediately.
 
-```typescript
-import { retry, handleAll, ExponentialBackoff } from 'cockatiel'
+```kotlin
+import io.github.resilience4j.core.IntervalFunction
+import io.github.resilience4j.kotlin.retry.executeSuspendFunction
+import io.github.resilience4j.retry.Retry
+import io.github.resilience4j.retry.RetryConfig
+import java.io.IOException
 
-const retryPolicy = retry(handleAll, {
-  maxAttempts: 3,
-  backoff: new ExponentialBackoff(),
-})
+val retryPolicy: Retry = Retry.of(
+    "users-api",
+    RetryConfig.custom<Any>()
+        .maxAttempts(3) // Includes the initial attempt.
+        .intervalFunction(IntervalFunction.ofExponentialRandomBackoff(1_000L, 2.0, 0.5))
+        .retryOnException { it is IOException }
+        .build(),
+)
 
-const data = await retryPolicy.execute(() => fetchFromApi('/users'))
+suspend fun loadUsers(fetchFromApi: suspend (String) -> List<User>): List<User> =
+    retryPolicy.executeSuspendFunction { fetchFromApi("/users") }
 ```
+
+## Reference
+
+- [Resilience4j Kotlin support](https://resilience4j.readme.io/docs/getting-started-4)
+- [Resilience4j retry configuration](https://resilience4j.readme.io/docs/retry)

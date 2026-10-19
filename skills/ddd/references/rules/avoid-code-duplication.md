@@ -7,115 +7,115 @@ impact: HIGH
 
 # Avoid Code Duplication — Function, Logic, Concept, and Pattern
 
+> Modified 2026-10-19: examples and language-specific notes adapted to Kotlin from NeoLabHQ's DDD rules (GPL-3.0-only).
+
 - Do NOT duplicate functions, business logic, domain concepts, or behavioral patterns. 
 - Apply DRY (Hunt & Thomas): "Every piece of knowledge must have a single, unambiguous, authoritative representation within a system." 
 - Allways extract on the third occurrence (Fowler's Rule of Three).
 
 ## Incorrect — Function Duplication
 
-Identical bodies copy-pasted across modules.
+Identical bodies copy-pasted across modules. The repository examples use an application-owned `DocumentCollection<T>` port with a suspending `findById` operation.
 
-```typescript
-// user-repository.ts
-function findUserById(id: string): Promise<User | null> {
-  return db.collection('users').findOne({ _id: id });
-}
+```kotlin
+// UserRepository.kt
+suspend fun findUserById(id: String): User? = userCollection.findById(id)
 
-// product-repository.ts — identical body, different name
-function findProductById(id: string): Promise<Product | null> {
-  return db.collection('products').findOne({ _id: id });
-}
+// ProductRepository.kt — identical body, different name
+suspend fun findProductById(id: String): Product? = productCollection.findById(id)
 ```
 
 ## Correct — Function Duplication
 
 Extract a generic function; callers specify only what differs.
 
-```typescript
-// repository.ts
-function findById<T>(collection: string, id: string): Promise<T | null> {
-  return db.collection(collection).findOne({ _id: id });
-}
+```kotlin
+// Repository.kt
+suspend fun <T> findById(collection: DocumentCollection<T>, id: String): T? =
+    collection.findById(id)
 
-const findUserById = (id: string) => findById<User>('users', id);
-const findProductById = (id: string) => findById<Product>('products', id);
+suspend fun findUserById(id: String): User? = findById(userCollection, id)
+suspend fun findProductById(id: String): Product? = findById(productCollection, id)
 ```
 
 ## Incorrect — Logic Duplication
 
-Same business rule in three services with different variable names. More subtle than function duplication — code looks different but encodes the same decision. When thresholds change, missed sites silently drift.
+Same business rule in three services with different variable names. The arithmetic uses `Double` for brevity; use the money representation chosen by the domain for real pricing. More subtle than function duplication — code looks different but encodes the same decision. When thresholds change, missed sites silently drift.
 
-```typescript
-// order-service.ts
-function calculateOrderDiscount(order: Order): number {
-  if (order.total > 500) return order.total * 0.1;
-  if (order.total > 200) return order.total * 0.05;
-  return 0;
+```kotlin
+// OrderService.kt
+fun calculateOrderDiscount(order: Order): Double = when {
+    order.total > 500.0 -> order.total * 0.1
+    order.total > 200.0 -> order.total * 0.05
+    else -> 0.0
 }
 
-// invoice-service.ts — same rule, different names and types
-function getInvoiceDiscount(invoice: Invoice): number {
-  if (invoice.amount > 500) return invoice.amount * 0.1;
-  if (invoice.amount > 200) return invoice.amount * 0.05;
-  return 0;
+// InvoiceService.kt — same rule, different names and types
+fun getInvoiceDiscount(invoice: Invoice): Double = when {
+    invoice.amount > 500.0 -> invoice.amount * 0.1
+    invoice.amount > 200.0 -> invoice.amount * 0.05
+    else -> 0.0
 }
 
-// report-service.ts — same thresholds embedded in a reduce
-function getDiscountedRevenue(transactions: Transaction[]): number {
-  return transactions.reduce((sum, t) => {
-    const discount = t.amount > 500 ? 0.1 : t.amount > 200 ? 0.05 : 0;
-    return sum + t.amount * (1 - discount);
-  }, 0);
-}
+// ReportService.kt — same thresholds embedded in a sum
+fun getDiscountedRevenue(transactions: List<Transaction>): Double =
+    transactions.sumOf { transaction ->
+        val discount = when {
+            transaction.amount > 500.0 -> 0.1
+            transaction.amount > 200.0 -> 0.05
+            else -> 0.0
+        }
+        transaction.amount * (1 - discount)
+    }
 ```
 
 ## Correct — Logic Duplication
 
 One domain function owns the rule. Changing thresholds happens in exactly one place.
 
-```typescript
-// pricing.ts — single source of truth
-function getDiscountRate(amount: number): number {
-  if (amount > 500) return 0.1;
-  if (amount > 200) return 0.05;
-  return 0;
+```kotlin
+// Pricing.kt — single source of truth
+fun getDiscountRate(amount: Double): Double = when {
+    amount > 500.0 -> 0.1
+    amount > 200.0 -> 0.05
+    else -> 0.0
 }
 
-// order-service.ts
-const discount = order.total * getDiscountRate(order.total);
+// OrderService.kt
+val orderDiscount = order.total * getDiscountRate(order.total)
 
-// invoice-service.ts
-const discount = invoice.amount * getDiscountRate(invoice.amount);
+// InvoiceService.kt
+val invoiceDiscount = invoice.amount * getDiscountRate(invoice.amount)
 
-// report-service.ts
-const revenue = transactions.reduce(
-  (sum, t) => sum + t.amount * (1 - getDiscountRate(t.amount)), 0
-);
+// ReportService.kt
+val revenue = transactions.sumOf { transaction ->
+    transaction.amount * (1 - getDiscountRate(transaction.amount))
+}
 ```
 
 ## Incorrect — Concept Duplication
 
 The concept "active user" is scattered as ad-hoc conditions across modules. Most dangerous form — code differs so tools will not flag it, yet every instance must stay in sync. Missed sites become silent bugs.
 
-```typescript
-// auth-middleware.ts
-if (user.status === 'active' && !user.deletedAt && user.emailVerified) {
-  allowAccess(user);
+```kotlin
+// AuthMiddleware.kt
+if (user.status == UserStatus.ACTIVE && user.deletedAt == null && user.emailVerified) {
+    allowAccess(user)
 }
 
-// notification-service.ts — subtly different expression
-if (user.status === 'active' && user.deletedAt === null && user.emailVerified === true) {
-  sendNotification(user);
+// NotificationService.kt — subtly different expression
+if (user.status == UserStatus.ACTIVE && user.deletedAt == null && user.emailVerified == true) {
+    sendNotification(user)
 }
 
-// billing-service.ts — concept drift: forgot emailVerified
-if (user.status === 'active' && !user.deletedAt) {
-  chargeSubscription(user);
+// BillingService.kt — concept drift: forgot emailVerified
+if (user.status == UserStatus.ACTIVE && user.deletedAt == null) {
+    chargeSubscription(user)
 }
 
-// analytics-service.ts — further drift: added own interpretation
-if (user.status === 'active' && !user.deletedAt && user.lastLoginAt) {
-  trackActiveUser(user);
+// AnalyticsService.kt — further drift: added its own interpretation
+if (user.status == UserStatus.ACTIVE && user.deletedAt == null && user.lastLoginAt != null) {
+    trackActiveUser(user)
 }
 ```
 
@@ -123,42 +123,43 @@ if (user.status === 'active' && !user.deletedAt && user.lastLoginAt) {
 
 Name the concept in a single predicate. When requirements change, update one function.
 
-```typescript
-// user-status.ts — authoritative definition
-function isActiveUser(user: User): boolean {
-  return user.status === 'active' && !user.deletedAt && user.emailVerified;
-}
+```kotlin
+// UserStatus.kt — authoritative definition
+fun isActiveUser(user: User): Boolean =
+    user.status == UserStatus.ACTIVE && user.deletedAt == null && user.emailVerified
 
-// auth-middleware.ts
-if (isActiveUser(user)) allowAccess(user);
+// AuthMiddleware.kt
+if (isActiveUser(user)) allowAccess(user)
 
-// notification-service.ts
-if (isActiveUser(user)) sendNotification(user);
+// NotificationService.kt
+if (isActiveUser(user)) sendNotification(user)
 
-// billing-service.ts — now correct
-if (isActiveUser(user)) chargeSubscription(user);
+// BillingService.kt — now correct
+if (isActiveUser(user)) chargeSubscription(user)
 
-// analytics-service.ts — shared definition + own criteria
-if (isActiveUser(user) && user.lastLoginAt) trackActiveUser(user);
+// AnalyticsService.kt — shared definition + own criteria
+if (isActiveUser(user) && user.lastLoginAt != null) trackActiveUser(user)
 ```
 
 ## Incorrect — Pattern Duplication
 
-Same fetch-validate-transform pattern repeated per API resource.
+Same fetch-validate-transform pattern repeated per API resource. Here `api` is an application-owned HTTP port whose suspending `get` returns a typed response with `status` and `body`; the resource decoders are also application functions.
 
-```typescript
-// user-api.ts
-async function fetchUser(id: string): Promise<User> {
-  const res = await fetch(`/api/users/${id}`);
-  if (!res.ok) throw new ApiError(`Failed: ${res.status}`);
-  return { ...(await res.json()), fetchedAt: new Date() };
+```kotlin
+import java.time.Instant
+
+// UserApi.kt
+suspend fun fetchUser(id: String): Fetched<User> {
+    val response = api.get("/api/users/$id")
+    if (response.status !in 200..299) throw ApiException("Failed: ${response.status}")
+    return Fetched(decodeUser(response.body), Instant.now())
 }
 
-// product-api.ts — same pattern, different resource
-async function fetchProduct(id: string): Promise<Product> {
-  const res = await fetch(`/api/products/${id}`);
-  if (!res.ok) throw new ApiError(`Failed: ${res.status}`);
-  return { ...(await res.json()), fetchedAt: new Date() };
+// ProductApi.kt — same pattern, different resource
+suspend fun fetchProduct(id: String): Fetched<Product> {
+    val response = api.get("/api/products/$id")
+    if (response.status !in 200..299) throw ApiException("Failed: ${response.status}")
+    return Fetched(decodeProduct(response.body), Instant.now())
 }
 ```
 
@@ -166,16 +167,28 @@ async function fetchProduct(id: string): Promise<Product> {
 
 Extract the recurring pattern into a generic abstraction.
 
-```typescript
-// api-client.ts
-async function fetchResource<T>(resource: string, id: string): Promise<T> {
-  const res = await fetch(`/api/${resource}/${id}`);
-  if (!res.ok) throw new ApiError(`Failed: ${res.status}`);
-  return { ...(await res.json()), fetchedAt: new Date() };
+```kotlin
+import java.time.Instant
+
+// ApiClient.kt
+// A wrapper adds metadata without pretending it is part of every resource type.
+data class Fetched<T>(val value: T, val fetchedAt: Instant)
+
+suspend fun <T> fetchResource(
+    resource: String,
+    id: String,
+    decode: (String) -> T,
+): Fetched<T> {
+    val response = api.get("/api/$resource/$id")
+    if (response.status !in 200..299) throw ApiException("Failed: ${response.status}")
+    return Fetched(decode(response.body), Instant.now())
 }
 
-const user = await fetchResource<User>('users', id);
-const product = await fetchResource<Product>('products', id);
+suspend fun loadResources(id: String): Pair<Fetched<User>, Fetched<Product>> {
+    val user = fetchResource("users", id, ::decodeUser)
+    val product = fetchResource("products", id, ::decodeProduct)
+    return user to product
+}
 ```
 
 ## Reference

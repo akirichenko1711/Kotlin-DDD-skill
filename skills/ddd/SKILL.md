@@ -6,17 +6,18 @@ metadata:
   upstream: NeoLabHQ/context-engineering-kit/plugins/ddd
   upstream-version: "3.0.0"
   upstream-revision: "23e2428e809d77717f8acc9659c374a3a1fcb93e"
-  adaptation: Native Codex skill wrapping the original 17 rule files.
+  adaptation: Native Codex skill with Kotlin examples for 17 upstream DDD rules.
 ---
 
 # Domain-driven design and code quality
 
-Codex adaptation dated 2026-10-19, based on NeoLabHQ's DDD rules. The entrypoint
-and contextual guidance were added; all 17 original rule files are unchanged.
+Codex and Kotlin adaptation dated 2026-10-19, based on NeoLabHQ's DDD rules.
+The entrypoint and contextual guidance were added, and the rule examples were
+adapted to Kotlin. Individual rule files carry dated modification notices.
 This adaptation is distributed under GPL-3.0-only; see [LICENSE](LICENSE),
 including its no-warranty terms.
 
-Use the original NeoLabHQ DDD rules to assess the code relevant to the task.
+Use the DDD principles adapted from NeoLabHQ to assess the code relevant to the task.
 Follow the current user instructions, applicable AGENTS.md, and repository
 conventions first. This skill can be used directly or alongside poteto-mode,
 Superpowers, and language-specific skills. It does not require Claude Code,
@@ -27,9 +28,11 @@ Cursor, any other plugin, or a change to global project instructions.
 1. Establish the requested behavior and the scope of the review or change.
    Distinguish the domain model, application workflow, persistence model,
    and boundary adapters that actually exist in this project.
-2. Read only the relevant rule files from the map below. Preserve their
-   original examples as explanations of the principle, not code to paste
-   into a different language or framework unchanged.
+2. Read only the relevant rule files from the map below. Treat the Kotlin
+   examples as explanations of the principle; adapt their application ports
+   and framework choices to the project rather than pasting them unchanged.
+   Call-site fragments belong inside application functions; suspending calls
+   require a suspending context. Examples using `java.*` target Kotlin/JVM.
 3. Trace a proposed finding to an actual behavior, responsibility, dependency,
    or data flow. Explain its practical consequence. Separate demonstrated
    defects from design tradeoffs and optional cleanup.
@@ -40,7 +43,7 @@ Cursor, any other plugin, or a change to global project instructions.
 
 ## Choose the relevant rules
 
-| Situation | Original rule |
+| Situation | Rule |
 |---|---|
 | Business logic depends on infrastructure | [Domain boundaries](references/rules/clean-architecture-ddd.md) |
 | Controllers, services, or repositories mix responsibilities | [Separation of concerns](references/rules/separation-of-concerns.md) |

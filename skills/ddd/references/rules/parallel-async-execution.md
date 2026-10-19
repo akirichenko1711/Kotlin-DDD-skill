@@ -6,16 +6,20 @@ paths:
 
 # Parallelize Independent Async Operations
 
+> Modified 2026-10-19: examples and language-specific notes adapted to Kotlin from NeoLabHQ's DDD rules (GPL-3.0-only).
+
 Independent asynchronous operations that share no data dependency must run concurrently, not sequentially. Sequential execution adds each operation's latency together. Concurrent execution reduces total latency to the slowest single operation.
 
-This applies to any I/O-bound work: HTTP requests, database queries, RPC calls, file reads, message-broker publishes, cache lookups, external API calls, child-process invocations, and similar. The same principle holds across runtimes and languages — only the syntax differs (e.g., `Promise.all` in JavaScript/TypeScript, `asyncio.gather` in Python, `errgroup`/goroutines in Go, structured concurrency in Kotlin, `tokio::join!` in Rust, threads or `CompletableFuture` in Java).
+This applies to I/O-bound work such as HTTP requests, database queries, and cache lookups. In Kotlin, use structured concurrency with `coroutineScope` and `async` for independent suspending calls. Declaring a function `suspend` does not make blocking I/O non-blocking; retain the project's dispatcher and client conventions.
+
+The examples assume application ports `DataService` and `ItemApi` with suspending `getData(key): Data` and `fetchItem(id): Item` methods. `Data` and `Item` are application value types.
 
 ## How to identify violations
 
-Scan for these patterns regardless of language:
+Scan for these patterns:
 
-- Two or more consecutive `await` (or equivalent blocking) calls where the second does **not** read from the first.
-- A `for` / `while` loop that `await`s one independent operation per iteration instead of dispatching all and awaiting once.
+- Consecutive suspending calls where the second does **not** read from the first.
+- A loop that completes one independent suspending operation per iteration instead of starting independent work together.
 - Sequential calls to different services, different endpoints, or different keys against the same service.
 - "Warm-up" or "prefetch" steps performed serially before the main work begins.
 
@@ -23,35 +27,60 @@ Scan for these patterns regardless of language:
 
 Two independent service calls awaited one after the other. Total latency = `latency(A) + latency(B)`.
 
-```ts
-const dataA = await serviceA.getData(key);
-const dataB = await serviceB.getData(key);
+```kotlin
+suspend fun loadData(
+    key: String,
+    serviceA: DataService,
+    serviceB: DataService,
+): Pair<Data, Data> {
+    val dataA = serviceA.getData(key)
+    val dataB = serviceB.getData(key)
+    return dataA to dataB
+}
 ```
 
 A loop awaiting one independent request at a time. Total latency = `N * latency(request)`.
 
-```ts
-const results: Item[] = [];
-for (const id of ids) {
-  results.push(await api.fetchItem(id));
+```kotlin
+suspend fun loadItems(ids: List<String>, api: ItemApi): List<Item> {
+    val results = mutableListOf<Item>()
+    for (id in ids) {
+        results += api.fetchItem(id)
+    }
+    return results
 }
 ```
 
 ## Correct
 
-Both calls dispatched simultaneously. Total latency = `max(latency(A), latency(B))`.
+Both calls are started before either result is awaited. With non-blocking clients and sufficient resources, total latency approaches `max(latency(A), latency(B))`.
 
-```ts
-const [dataA, dataB] = await Promise.all([
-  serviceA.getData(key),
-  serviceB.getData(key),
-]);
+```kotlin
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+
+suspend fun loadData(
+    key: String,
+    serviceA: DataService,
+    serviceB: DataService,
+): Pair<Data, Data> = coroutineScope {
+    val dataA = async { serviceA.getData(key) }
+    val dataB = async { serviceB.getData(key) }
+    dataA.await() to dataB.await()
+}
 ```
 
-All requests dispatched concurrently, awaited once. Total latency ≈ `max(latency(request_i))`.
+For a small bounded batch and a concurrent-safe client, start all requests and collect their results in input order. Large batches require bounded concurrency rather than one coroutine per item.
 
-```ts
-const results = await Promise.all(ids.map((id) => api.fetchItem(id)));
+```kotlin
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+
+suspend fun loadItems(ids: List<String>, api: ItemApi): List<Item> =
+    coroutineScope {
+        ids.map { id -> async { api.fetchItem(id) } }.awaitAll()
+    }
 ```
 
 
@@ -59,6 +88,10 @@ const results = await Promise.all(ids.map((id) => api.fetchItem(id)));
 
 - **Data dependency.** A later operation reads from an earlier operation's result.
 - **Ordering or causality.** The operations must observably happen in a specific order (e.g., write-then-read against a non-linearizable store).
-- **Rate limits, quotas, or backpressure.** Parallelism would exceed downstream limits; prefer a bounded-concurrency primitive (e.g., a worker pool, `p-limit`, semaphore) instead of full parallelism.
+- **Rate limits, quotas, or backpressure.** Parallelism would exceed downstream limits; prefer a bounded worker pool or semaphore instead of unbounded concurrency.
 - **Resource contention.** The operations contend for a single connection, lock, or transaction.
-- **Failure-handling differences.** When one failure must short-circuit and cancel siblings, or when partial success must be reported per-item, choose the right primitive (`Promise.allSettled`, `errgroup` with context cancellation, `asyncio.gather(return_exceptions=True)`, etc.) instead of naive "all-or-nothing".
+- **Failure-handling differences.** `coroutineScope` cancels sibling children when a child fails. For partial per-item outcomes, design explicit failure handling with `supervisorScope`; it does not turn `awaitAll` into an all-settled operation. Always propagate `CancellationException`.
+
+## Reference
+
+- [Composing suspending functions](https://kotlinlang.org/docs/composing-suspending-functions.html) — Kotlin documentation

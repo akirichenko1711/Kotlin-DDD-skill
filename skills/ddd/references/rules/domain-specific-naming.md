@@ -8,9 +8,11 @@ impact: HIGH
 
 # Use Domain-Specific Names Instead of Generic Module Names
 
+> Modified 2026-10-19: examples and language-specific notes adapted to Kotlin from NeoLabHQ's DDD rules (GPL-3.0-only).
+
 Avoid generic module names like `utils`, `helpers`, `common`, and `shared`. These names attract unrelated functions, creating grab-bag files with no cohesion. Use domain-specific names that reflect the bounded context and the module's single responsibility -- names like `OrderCalculator`, `UserAuthenticator`, or `InvoiceGenerator` make purpose immediately clear and enforce cohesion by design.
 
-Generic names signal missing domain analysis. When a developer reaches for `utils.ts`, it usually means the function belongs in a domain module that has not been identified yet. Naming modules after their domain concept prevents them from becoming dumping grounds and keeps each module focused on a single, clear purpose.
+Generic names signal missing domain analysis. When a developer reaches for `Utils.kt`, it usually means the function belongs in a domain module that has not been identified yet. Naming modules after their domain concept prevents them from becoming dumping grounds and keeps each module focused on a single, clear purpose.
 
 ## Critical princeples
 
@@ -24,45 +26,45 @@ Generic names signal missing domain analysis. When a developer reaches for `util
 
 Generic module names attract unrelated functions, making the file a dumping ground with no cohesion or clear ownership.
 
-```typescript
-// utils.ts — grab-bag of unrelated functions
-export function calculateOrderTotal(items: OrderItem[]): number {
-  return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-}
+```kotlin
+import java.math.BigDecimal
 
-export function formatUserDisplayName(user: User): string {
-  return `${user.firstName} ${user.lastName}`;
-}
+// Utils.kt — grab-bag of unrelated functions
+fun calculateOrderTotal(items: List<OrderItem>): BigDecimal =
+    items.fold(BigDecimal.ZERO) { sum, item ->
+        sum + item.price * item.quantity.toBigDecimal()
+    }
 
-export function generateInvoiceNumber(): string {
-  return `INV-${Date.now()}`;
-}
+fun formatUserDisplayName(user: User): String =
+    "${user.firstName} ${user.lastName}"
+
+fun generateInvoiceNumber(): String = "INV-${System.currentTimeMillis()}"
 ```
 
 Generic Naming Anti-Patterns:
-- `utils.js` with 50 unrelated functions
-- `helpers/misc.js` as a dumping ground
-- `common/shared.js` with unclear purpose
+- `Utils.kt` with 50 unrelated functions
+- `helpers/Misc.kt` as a dumping ground
+- `common/Shared.kt` with unclear purpose
 
 ## Correct
 
 Each function lives in a module named after its bounded context, enforcing single responsibility and making purpose self-documenting.
 
-```typescript
-// order-calculator.ts — all order pricing logic
-export function calculateOrderTotal(items: OrderItem[]): number {
-  return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-}
+```kotlin
+import java.math.BigDecimal
 
-// user-display.ts — user presentation formatting
-export function formatUserDisplayName(user: User): string {
-  return `${user.firstName} ${user.lastName}`;
-}
+// OrderCalculator.kt — all order pricing logic
+fun calculateOrderTotal(items: List<OrderItem>): BigDecimal =
+    items.fold(BigDecimal.ZERO) { sum, item ->
+        sum + item.price * item.quantity.toBigDecimal()
+    }
 
-// invoice-generator.ts — invoice creation logic
-export function generateInvoiceNumber(): string {
-  return `INV-${Date.now()}`;
-}
+// UserDisplay.kt — user presentation formatting
+fun formatUserDisplayName(user: User): String =
+    "${user.firstName} ${user.lastName}"
+
+// InvoiceGenerator.kt — invoice creation logic
+fun generateInvoiceNumber(): String = "INV-${System.currentTimeMillis()}"
 ```
 
 ## Reference
