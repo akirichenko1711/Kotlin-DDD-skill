@@ -1,0 +1,113 @@
+--- upstream/kotlin-tooling-agp9-migration/scripts/analyze-project.sh
++++ local/kotlin-tooling-agp9-migration/scripts/analyze-project.sh
+@@ -1,4 +1,5 @@
+ #!/bin/sh
++# Local modifications (2026-10-19): handle module paths safely and correct AGP migration recommendations.
+ #
+ # analyze-project.sh - Analyze a Gradle/KMP project for AGP 9.0 migration readiness
+ #
+@@ -65,9 +66,10 @@
+ echo "----------------------------------------"
+ 
+ # Find all build.gradle.kts and build.gradle files
+-BUILD_FILES=$(find "$PROJECT_ROOT" -name "build.gradle.kts" -o -name "build.gradle" | grep -v '.gradle/' | grep -v 'build/' | sort)
+-
+-for BUILD_FILE in $BUILD_FILES; do
++BUILD_FILES=$(find "$PROJECT_ROOT" -type d \( -name '.gradle' -o -name 'build' \) -prune -o -type f \( -name 'build.gradle.kts' -o -name 'build.gradle' \) -print | sort)
++
++while IFS= read -r BUILD_FILE; do
++    [ -n "$BUILD_FILE" ] || continue
+     REL_PATH=$(echo "$BUILD_FILE" | sed "s|$PROJECT_ROOT/||")
+     MODULE_DIR=$(dirname "$BUILD_FILE")
+     REL_MODULE=$(echo "$MODULE_DIR" | sed "s|$PROJECT_ROOT||" | sed 's|^/||')
+@@ -149,12 +151,12 @@
+     if [ "$HAS_APPLY_FALSE" = "yes" ]; then
+         echo "    -> Root buildscript: update plugin versions only"
+     elif [ "$HAS_KMP" = "yes" ] && [ "$HAS_ANDROID_LIB" = "yes" ]; then
+-        echo "    -> Replace com.android.library with android-kotlin-multiplatform-library"
+-        echo "    -> Move android {} config into androidTarget {} in kotlin {} block"
++        echo "    -> Replace com.android.library with com.android.kotlin.multiplatform.library"
++        echo "    -> Move Android config into kotlin { android { ... } }"
+         echo "    -> Remove the standalone android {} block"
+     elif [ "$HAS_KMP" = "yes" ] && [ "$HAS_ANDROID_APP" = "yes" ]; then
+         echo "    -> Split into separate androidApp module (com.android.application)"
+-        echo "    -> Convert shared KMP module to use android-kotlin-multiplatform-library"
++        echo "    -> Convert shared KMP module to use com.android.kotlin.multiplatform.library"
+         echo "    -> Move Android entry point (Activity) to the new androidApp module"
+     elif [ "$HAS_ANDROID_APP" = "yes" ] && [ "$HAS_KMP" = "no" ]; then
+         echo "    -> Pure Android app module: update AGP to 9.x, no KMP migration needed"
+@@ -167,7 +169,9 @@
+     else
+         echo "    -> No Android plugins detected: no AGP migration needed"
+     fi
+-done
++done <<EOF
++$BUILD_FILES
++EOF
+ 
+ echo ""
+ 
+--- upstream/kotlin-tooling-native-build-performance/scripts/audit-native-build.sh
++++ local/kotlin-tooling-native-build-performance/scripts/audit-native-build.sh
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env bash
++# Local modification (2026-10-19): handle CI workflow paths containing spaces.
+ # Static audit for Kotlin/Native build performance in a KMP project.
+ #
+ # Read-only: scans Gradle properties, build scripts, shell scripts, and CI
+@@ -126,7 +127,8 @@
+ 
+ WORKFLOW_HITS=$(grep -RIlE "${EXCLUDES[@]}" --include='*.yml' --include='*.yaml' \
+     -e 'gradlew|gradle/actions|setup-gradle' "$ROOT/.github" 2>/dev/null || true)
+-for wf in $WORKFLOW_HITS; do
++while IFS= read -r wf; do
++    [ -n "$wf" ] || continue
+     if ! grep -qE '\.konan' "$wf"; then
+         FINDINGS=$((FINDINGS + 1))
+         printf '[%s] %s\n        %s\n        -> %s\n' \
+@@ -134,7 +136,9 @@
+             "workflow runs Gradle but does not cache ~/.konan (cold Kotlin/Native toolchain every run)" \
+             "references/caching-and-gradle.md: keep .konan warm in CI"
+     fi
+-done
++done <<EOF
++$WORKFLOW_HITS
++EOF
+ 
+ ## 6. Informational
+ 
+--- upstream/kotlin-backend-jpa-entity-mapping/SKILL.md
++++ local/kotlin-backend-jpa-entity-mapping/SKILL.md
+@@ -11,6 +11,7 @@
+ license: Apache-2.0
+ metadata:
+   author: JetBrains
++  local-modifications: "2026-10-19: corrected the mapped-class hash example and clarified proxy and inheritance conventions."
+   version: "1.0.0"
+ ---
+ 
+@@ -79,7 +80,7 @@
+         return id != null && id == other.id
+     }
+ 
+-    override fun hashCode(): Int = javaClass.hashCode()
++    override fun hashCode(): Int = Order::class.java.hashCode()
+ 
+     // toString must NOT reference lazy collections
+     override fun toString(): String = "Order(id=$id, status=$status)"
+@@ -87,10 +88,13 @@
+ ```
+ 
+ **Key rules:**
+-- `equals` compares by ID only — stable under dirty tracking and proxy unwrapping
+-- `hashCode` returns class-based constant — avoids `Set`/`Map` corruption after persist
++- `equals` compares non-null IDs for supported entity types; verify the project's proxy and inheritance strategy
++- `hashCode` uses the mapped `Order` class constant, not runtime `javaClass`, so equal subclasses share its hash and assigning an ID does not change it
+ - `toString` excludes lazy-loaded relations — prevents `LazyInitializationException`
+ - Constructor params are mutable entity fields; DB-generated `id` is nullable with a protected setter
++
++This is an illustrative identity strategy. Retain an existing proxy-aware or inheritance-aware
++project convention and test it with the project's ORM configuration before adopting it.
+ 
+ ## Uniqueness Constraints
+ 
