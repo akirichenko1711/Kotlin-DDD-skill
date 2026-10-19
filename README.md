@@ -1,6 +1,6 @@
 # Kotlin DDD skill
 
-A collection of **11 skills for Codex**: one DDD skill with 17 rules and 10 Kotlin skills. Created to make architecture reviews and Kotlin development guidance easy to install and use together, with Codex adaptations and targeted fixes.
+Help Codex build and review Kotlin projects with clear domain boundaries, safer persistence models, and practical build guidance. Use it to spot design issues, migrate Java code, upgrade Kotlin Multiplatform projects, and investigate slow Kotlin/Native builds.
 
 ## Install
 
